@@ -5,6 +5,7 @@
 # Setup -------------------------------------------------------------------
 
 library(tidyverse)
+library(geosphere)
 library(arrow)
 library(doParallel); registerDoParallel(cores = 15)
 
@@ -13,7 +14,7 @@ library(doParallel); registerDoParallel(cores = 15)
 
 # Function for loading a file to extract unique port info
 extract_ports <- function(file_name){
-  port_df <- arrow::read_delim_arrow("data/MovementData_2015H1.txt", delim = "\t") |> 
+  port_df <- arrow::read_delim_arrow(file_name, delim = "\t") |> 
     dplyr::select(Country:AnchorageParentName) |> 
     distinct()
   return(port_df)
