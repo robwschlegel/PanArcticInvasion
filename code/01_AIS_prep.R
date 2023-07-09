@@ -49,28 +49,8 @@ all_AIS <- read_csv_arrow("data/all_AIS.csv")
 arctic_ships <- read_csv_arrow("metadata/arctic_ships.csv")
 
 # Previous two ports of call
-ship_1 <- all_AIS |> 
-  filter(ShipName == "ANTIGUA") |> arrange(desc(ArrivalDateFull)) |> 
-  left_join(arctic_ports, by = join_by(Country, PortID, PortName, PortGeoID, ZoneName)) |>
-  mutate(Arctic = case_when(REALM == "Arctic" ~ 1, TRUE ~ 0)) |> 
-  dplyr::select(CallID, ShipName, ZoneName, PortLatitudeDecimal, PortLongitudeDecimal, 
-                ArrivalDateFull, SailDateFull, ArrivalDraught, DepartureDraught, HoursinPort, Arctic) |> 
-  dplyr::rename(lon = PortLongitudeDecimal, lat = PortLatitudeDecimal)
-ship_2 <- which(ship_1$Arctic == TRUE)
-ship_3 <- ship_1[c(ship_2[1], ship_2[1]+1, ship_2[1]+2),] |> 
-  filter(!is.na(ShipName)) |> # Catch edge cases when last port is at end of time series
-  mutate(port_idx = 1:n())
-ship_4 <- ship_3 |> 
-  pivot_longer(c(-ShipName, -port_idx), names_to = "key", values_to = "val", 
-               values_transform = list(val = as.character)) |> 
-  pivot_wider(values_from = val, names_from = c(key, port_idx)) |> 
-  mutate(across(contains(c("CallID", "lon", "lat", "Draught", "Hours", "Arctic")), as.numeric)) |> 
-  mutate(across(contains("Date"), as.POSIXct)) |> 
-  mutate(Arctic_sum = Arctic_1+ Arctic_2 + Arctic_3,
-         dist_1 = 0,
-         dist_2 = distm(c(lon_1, lat_1), c(lon_2, lat_2), fun = distHaversine)[1]/1000,
-         dist_3 = distm(c(lon_2, lat_2), c(lon_3, lat_3), fun = distHaversine)[1]/1000,
-         time_1 = 0,
-         time_2 = ArrivalDateFull_1 - SailDateFull_2,
-         time_3 = ArrivalDateFull_2 - SailDateFull_3)
+system.time(
+arctic_previous_ports <- plyr::ldply(unique(arctic_ships$ShipName)[1:20], previous_ports, .parallel = T)
+) # 38 seconds for first 20 with multi-core, 54 without
+write_csv_arrow(arctic_previous_ports, file = "data/arctic_previous_ports.csv")
 

@@ -52,6 +52,7 @@ rsconnect/
 data/Movement*
 data/Combined*
 data/all_AIS.csv
+data/arctic_previous_ports.csv
 
 # Restricted metadata
 metadata/*ports.csv
