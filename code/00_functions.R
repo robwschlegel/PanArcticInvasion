@@ -18,3 +18,5 @@ extract_ports <- function(file_name){
     distinct()
   return(port_df)
 }
+
+# Determine ships that arrived in a port and the previous two ports

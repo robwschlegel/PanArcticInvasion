@@ -51,6 +51,8 @@ rsconnect/
 # Large AIS data files
 data/Movement*
 data/Combined*
+data/all_AIS.csv
 
 # Restricted metadata
 metadata/*ports.csv
+metadata/*ships.csv
