@@ -50,7 +50,7 @@ arctic_ships <- read_csv_arrow("metadata/arctic_ships.csv")
 
 # Previous two ports of call
 system.time(
-arctic_previous_ports <- plyr::ldply(unique(arctic_ships$ShipName)[1:20], previous_ports, .parallel = T)
-) # 38 seconds for first 20 with multi-core, 54 without
+arctic_previous_ports <- plyr::ldply(unique(arctic_ships$ShipName), previous_ports, .parallel = T)
+) # 38 seconds for first 20 with multi-core, 54 without, xxx for all
 write_csv_arrow(arctic_previous_ports, file = "data/arctic_previous_ports.csv")
 
