@@ -77,6 +77,12 @@ previous_ports <- function(ship_name){
 
 # Various -----------------------------------------------------------------
 
+# Function for re-loading .RData files as necessary
+loadRData <- function(fileName){
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
 # Convenience function for loading .asc files
 load_asc <- function(file_name, col_name){
   df <- as.data.frame(raster(file_name), xy = T) %>% 
