@@ -48,12 +48,20 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
+# Restricted metadata
+metadata/*ports.csv
+metadata/*ships.csv
+
 # Large AIS data files
 data/Movement*
 data/Combined*
 data/all_AIS.csv
 data/arctic_previous_ports.csv
 
-# Restricted metadata
-metadata/*ports.csv
-metadata/*ships.csv
+# Large BioOracle downloads
+data/BO_present.RData
+data/BO_future.RData
+data/BO_2050.RData
+data/BO_2100.RData
+
+

@@ -74,3 +74,11 @@ previous_ports <- function(ship_name){
   # rm(ship_name, ship_df, ship_idx, ship_res)
 }
 
+
+# Various -----------------------------------------------------------------
+
+# Convenience function for loading .asc files
+load_asc <- function(file_name, col_name){
+  df <- as.data.frame(raster(file_name), xy = T) %>% 
+    `colnames<-`(c("lon", "lat", col_name))
+}
