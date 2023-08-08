@@ -85,6 +85,16 @@ loadRData <- function(fileName){
 
 # Convenience function for loading .asc files
 load_asc <- function(file_name, col_name){
-  df <- as.data.frame(raster(file_name), xy = T) %>% 
+  df <- as.data.frame(raster(file_name), xy = T) |> 
     `colnames<-`(c("lon", "lat", col_name))
 }
+
+# Quickly convert biomod2 raster to a data.frame
+rast_df <- function(rast){
+  df_out <- as.data.frame(rast[[1]], xy = T) |> 
+    `colnames<-`(c("lon", "lat", "presence")) |>  
+    # mutate(lon = round(lon, 4), lat = round(lat, 4)) %>% 
+    # left_join(bathy_layer, by = c("lon", "lat")) %>% 
+    na.omit() 
+}
+
