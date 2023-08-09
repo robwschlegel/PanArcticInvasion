@@ -25,7 +25,7 @@ library(doParallel)
 
 # The species occurrence data
 sps_list <- read_csv("metadata/species_list.csv") |> filter(!is.na(`Taxonomic Group`))
-sps_files <- dir("data/spp_presence", full.names = T, pattern = "final")
+sps_files <- dir("~/PanArcticInvasion/data/spp_presence", full.names = T, pattern = "final")
 sps_names <- str_remove(dir("data/spp_presence", full.names = F, pattern = "final"), pattern = "_final.csv")
 
 
@@ -58,7 +58,8 @@ stack_2100 <- stack(rasterFromXYZ(BO_2100, crs = "+proj=longlat +ellps=WGS84 +to
 biomod_pipeline <- function(sps_choice, force_run){
   
   # The species abbreviation
-  sps_name <- str_remove(sapply(strsplit(sps_choice, "/"), "[[", 3), "_final.csv")
+  # NB: This will change based on the users folder structure
+  sps_name <- str_remove(sapply(strsplit(sps_choice, "/"), "[[", 7), "_final.csv")
   
   # Message for current run
   print(paste0("Began run on ",sps_name))
@@ -72,10 +73,10 @@ biomod_pipeline <- function(sps_choice, force_run){
   
   # Set temp folder save locations
   # See: http://www.r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
-  # sps_path <- paste0("data/spp_projection/",sps_name)
-  dir.create(file.path(sps_name), showWarnings = FALSE)
-  dir.create(file.path(paste0(sps_name,"/Temp")), showWarnings = FALSE)
-  rasterOptions(tmpdir = paste0(sps_name,"/Temp"))
+  sps_path <- paste0("~/PanArcticInvasion/data/spp_projection/",sps_name)
+  dir.create(file.path(sps_path), showWarnings = FALSE)
+  dir.create(file.path(paste0(sps_path,"/Temp")), showWarnings = FALSE)
+  rasterOptions(tmpdir = paste0(sps_path,"/Temp"))
   
   
   # 3: Prep data ------------------------------------------------------------
@@ -112,7 +113,7 @@ biomod_pipeline <- function(sps_choice, force_run){
   # plot(biomod_data) # plot selected pseudo-absences
   
   # Save the pre-model data for possible later use
-  saveRDS(biomod_data, file = paste0(sps_name,"/",sps_name,".base.Rds"))
+  saveRDS(biomod_data, file = paste0(sps_path,"/",sps_name,".base.Rds"))
   # biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
   
   
@@ -122,8 +123,8 @@ biomod_pipeline <- function(sps_choice, force_run){
   biomod_option <- BIOMOD_ModelingOptions()
   
   # Load if the model has already been run
-  if(file.exists(paste0(sps_name,"/",sps_name,".",sps_name,".models.out")) & !force_run){
-    biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
+  if(file.exists(paste0(sps_path,"/",sps_name,".",sps_name,".models.out")) & !force_run){
+    biomod_model <- loadRData(paste0(sps_path,"/",sps_name,".",sps_name,".models.out"))
   } else {
     # Run the model
     # system.time(
@@ -145,8 +146,8 @@ biomod_pipeline <- function(sps_choice, force_run){
   }
   
   # Load if the model has already been run
-  if(file.exists(paste0(sps_name,"/",sps_name,".",sps_name,".ensemble.models.out")) & !force_run){
-    biomod_ensemble <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,"ensemble.models.out"))
+  if(file.exists(paste0(sps_path,"/",sps_name,".",sps_name,".ensemble.models.out")) & !force_run){
+    biomod_ensemble <- loadRData(paste0(sps_path,"/",sps_name,".",sps_name,"ensemble.models.out"))
   } else {
     # Build the ensemble models
     # system.time(
@@ -275,11 +276,14 @@ biomod_pipeline <- function(sps_choice, force_run){
   # unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
   
   # Unlink Temp folder
-  unlink(paste0(sps_name,"/Temp"), recursive = TRUE)
+  unlink(paste0(sps_path,"/Temp"), recursive = TRUE)
 }
 
 
 # 7: Run the pipeline -----------------------------------------------------
+
+# Change the working directory so that biomod2 saves the results in a convenient folder
+setwd("data/spp_projections/")
 
 # Detect available cores automagically and set accordingly
 # registerDoParallel(cores = detectCores()-1)
@@ -287,14 +291,17 @@ biomod_pipeline <- function(sps_choice, force_run){
 # Run one
 # registerDoParallel(cores = 1)
 system.time(biomod_pipeline(sps_files[1], force_run = TRUE))
-# 78 seconds for 1 species on minimum reps
+# 150 seconds for 1 species on minimum reps
 
 # Run them all
 registerDoParallel(cores = 15)
 # NB: Currently failing
 system.time(
-plyr::l_ply(sps_files[1:15], biomod_pipeline, .parallel = TRUE, force_run = TRUE)
-) # xxx seconds for 15 on minimum reps
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE, force_run = TRUE)
+) # xxx seconds for 15 on minimum reps, ~38 minutes for all on minimum reps (many errors)
+
+## Error log
+# task 16 failed - "missing value where TRUE/FALSE needed"
 
 
 # 8: Analyse model output -------------------------------------------------
@@ -418,5 +425,5 @@ plot_biomod <- function(sps_choice){
 
 # Create all visuals
 registerDoParallel(cores = 15)
-plyr::l_ply(sps_names[1:15], plot_biomod, .parallel = T)
+plyr::l_ply(sps_names, plot_biomod, .parallel = T)
 
