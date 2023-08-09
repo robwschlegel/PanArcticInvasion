@@ -64,4 +64,10 @@ data/BO_future.RData
 data/BO_2050.RData
 data/BO_2100.RData
 
+# To be made public at a later date...
+figures/
+data/spp_presence/
+data/spp_projection/
+metadata/decision_tree.csv
+metadata/species_list.csv
 

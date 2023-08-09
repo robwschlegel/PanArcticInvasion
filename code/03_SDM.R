@@ -316,7 +316,7 @@ setwd("~/PanArcticInvasion/data/spp_projection/")
 
 # Run one
 # registerDoParallel(cores = 1)
-system.time(biomod_pipeline(sps_files[72]))
+system.time(biomod_pipeline(sps_files[14]))
 # 150 seconds for 1 species on minimum reps
 
 # Run them all
@@ -324,7 +324,7 @@ registerDoParallel(cores = 15)
 # NB: Currently failing
 system.time(
 plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
-) # xxx seconds for 15 on minimum reps, ~38 minutes for all on minimum reps (many errors)
+) # ~38 minutes for all on minimum reps (many errors)
 
 ## Error log
 # task 16 failed - "missing value where TRUE/FALSE needed"
@@ -343,7 +343,7 @@ plyr::l_ply(sps_file_rerun, biomod_pipeline, .parallel = FALSE)
 sps_date <- file.info(dir("~/PanArcticInvasion/data/spp_projection", full.names = T)) |> 
   rownames_to_column(var = "folder_name") |> 
   mutate(folder_name = sapply(strsplit(folder_name, "/"), "[[", 7)) |> 
-  filter(ctime < Sys.Date()-1) # Number of days in the past, may need to be adjusted
+  filter(ctime < Sys.Date()) # Number of days in the past, may need to be adjusted
 sps_date_rerun <- sps_files[which(sps_folders$folder_name %in% sps_names)]
 plyr::l_ply(sps_date_rerun, biomod_pipeline, .parallel = TRUE)
 
