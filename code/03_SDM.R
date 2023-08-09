@@ -149,13 +149,13 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
     biomod_model <- BIOMOD_Modeling(
       bm.format = biomod_data,
       modeling.id = sps_name,
-      models = c("RF", "GLM"),# "GAM", "ANN", "MARS"),
+      models = c("RF", "GLM", "GAM", "ANN", "MARS"),
       bm.options = biomod_option,
       CV.strategy = "random",
-      CV.nb.rep = 1, # 5 final # 1 testing
+      CV.nb.rep = 5, # 5 final # 1 testing
       CV.perc = 0.7,
       metric.eval = c("TSS", "ROC", "KAPPA", "ACCURACY"),
-      var.import = 1, # 3 final # 1 testing
+      var.import = 3, # 3 final # 1 testing
       scale.models = TRUE,
       CV.do.full.models = FALSE,
       nb.cpu = 1,
@@ -173,12 +173,12 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
       bm.mod = biomod_model,
       models.chosen = "all",
       em.by = "all",
-      em.algo = c("EMmean"),# "EMcv", "EMci"), 
+      em.algo = c("EMmean", "EMcv", "EMci"), 
       metric.select = c("TSS"),
       metric.select.thresh = c(0.7),
-      metric.eval = c("TSS", "ROC"), #, "KAPPA, "ACCURACY"),
+      metric.eval = c("TSS", "ROC", "KAPPA", "ACCURACY"),
       EMci.alpha = 0.05,
-      var.import = 0, # 5 final # 0 testing
+      var.import = 5, # 5 final # 0 testing
       nb.cpu = 1)
     # ) # ~40 minutes for full data 75 model run
   }
@@ -316,7 +316,7 @@ setwd("~/PanArcticInvasion/data/spp_projection/")
 
 # Run one
 # registerDoParallel(cores = 1)
-system.time(biomod_pipeline(sps_files[14]))
+# system.time(biomod_pipeline(sps_files[14]))
 # 150 seconds for 1 species on minimum reps
 
 # Run them all
@@ -340,12 +340,12 @@ sps_file_rerun <- sps_files[which(!sps_dot_names %in% sps_file_count$dir)]
 plyr::l_ply(sps_file_rerun, biomod_pipeline, .parallel = FALSE)
 
 ### By date
-sps_date <- file.info(dir("~/PanArcticInvasion/data/spp_projection", full.names = T)) |> 
-  rownames_to_column(var = "folder_name") |> 
-  mutate(folder_name = sapply(strsplit(folder_name, "/"), "[[", 7)) |> 
-  filter(ctime < Sys.Date()) # Number of days in the past, may need to be adjusted
-sps_date_rerun <- sps_files[which(sps_folders$folder_name %in% sps_names)]
-plyr::l_ply(sps_date_rerun, biomod_pipeline, .parallel = TRUE)
+# sps_date <- file.info(dir("~/PanArcticInvasion/data/spp_projection", full.names = T)) |> 
+#   rownames_to_column(var = "folder_name") |> 
+#   mutate(folder_name = sapply(strsplit(folder_name, "/"), "[[", 7)) |> 
+#   filter(ctime < Sys.Date()) # Number of days in the past, may need to be adjusted
+# sps_date_rerun <- sps_files[which(sps_folders$folder_name %in% sps_names)]
+# plyr::l_ply(sps_date_rerun, biomod_pipeline, .parallel = TRUE)
 
 
 # Set working directory back to project base
@@ -355,21 +355,21 @@ setwd("~/PanArcticInvasion/")
 # 8: Analyse model output -------------------------------------------------
 
 # Choose a species for the following code
-sps_choice <- sps_names[1]
+# sps_choice <- sps_names[1]
 
 # Load chosen biomod_model and print evaluation scores
-biomod_model <- loadRData(paste0(sps_choice,"/",sps_choice,".",sps_choice,".models.out"))
-biomod_model
-get_evaluations(biomod_model)
+# biomod_model <- loadRData(paste0(sps_choice,"/",sps_choice,".",sps_choice,".models.out"))
+# biomod_model
+# get_evaluations(biomod_model)
 
 # Model evaluation by 
-bm_PlotEvalMean(biomod_model, dataset = "calibration", metric.eval = c('ROC','TSS'))
+# bm_PlotEvalMean(biomod_model, dataset = "calibration", metric.eval = c('ROC','TSS'))
 
 # Model evaluation by 
-bm_PlotEvalMean(biomod_model, dataset = "validation", metric.eval = c('ROC','TSS'))
+# bm_PlotEvalMean(biomod_model, dataset = "validation", metric.eval = c('ROC','TSS'))
 
 # Model evaluation by 
-bm_PlotEvalMean(biomod_model, dataset = "evaluation", metric.eval = c('ROC','TSS'))
+# bm_PlotEvalMean(biomod_model, dataset = "evaluation", metric.eval = c('ROC','TSS'))
 
 # NB: Consider using evaluation code from '~/HBCproject/analyses/2.EvaluationScores.R'
 
