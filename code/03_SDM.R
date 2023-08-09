@@ -24,9 +24,19 @@ library(FNN)
 library(doParallel)
 
 # The species occurrence data
-sps_list <- read_csv("metadata/species_list.csv") |> filter(!is.na(`Taxonomic Group`))
+sps_list <- read_csv("~/PanArcticInvasion/metadata/species_list.csv") |> 
+  filter(!is.na(`Taxonomic Group`)) |> dplyr::select(`Functional Group`:Acronym) |> 
+  # NB: Remove notes from species names to work with pipeline below
+  mutate(`Scientific name` = sapply(strsplit(`Scientific name`, " - "), "[[", 1),
+         `Scientific name` = sapply(strsplit(`Scientific name`, " \\("), "[[", 1))
 sps_files <- dir("~/PanArcticInvasion/data/spp_presence", full.names = T, pattern = "final")
-sps_names <- str_remove(dir("data/spp_presence", full.names = F, pattern = "final"), pattern = "_final.csv")
+sps_names <- str_remove(dir("~/PanArcticInvasion/data/spp_presence", 
+                            full.names = F, pattern = "final"), pattern = "_final.csv")
+sps_dot_names <- str_replace(sps_names, "_", ".")
+
+# NB: In the methodology all species with fewer than 40 points were removed from the study
+# Here is was found that a few species have fewer than 40 independent points
+# But for the time being they are still included in this analysis
 
 
 # 2: Load data ------------------------------------------------------------
@@ -52,14 +62,15 @@ stack_2100 <- stack(rasterFromXYZ(BO_2100, crs = "+proj=longlat +ellps=WGS84 +to
 # plot(stack_present_baby)
 
 # Choose a species for testing the code
-# sps_choice <- sps_files[119]
+# sps_choice <- sps_files[73]
 
 # The full pipeline wrapped into a function
-biomod_pipeline <- function(sps_choice, force_run){
+biomod_pipeline <- function(sps_choice, force_run = TRUE){
   
   # The species abbreviation
   # NB: This will change based on the users folder structure
   sps_name <- str_remove(sapply(strsplit(sps_choice, "/"), "[[", 7), "_final.csv")
+  sps_dot_name <- str_replace(sps_name, "_", ".")
   
   # Message for current run
   print(paste0("Began run on ",sps_name))
@@ -74,10 +85,16 @@ biomod_pipeline <- function(sps_choice, force_run){
   
   # Set temp folder save locations
   # See: http://www.r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
-  sps_path <- paste0("~/PanArcticInvasion/data/spp_projection/",sps_name)
+  sps_path <- paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name)
   dir.create(file.path(sps_path), showWarnings = FALSE)
   dir.create(file.path(paste0(sps_path,"/Temp")), showWarnings = FALSE)
   rasterOptions(tmpdir = paste0(sps_path,"/Temp"))
+  
+  # Stop model process if not enough rows of data
+  # if(nrow(sps) < 40){
+  #   print("Fewer than 40 independent data points")
+  #   return()
+  # }
   
   
   # 3: Prep data ------------------------------------------------------------
@@ -105,7 +122,7 @@ biomod_pipeline <- function(sps_choice, force_run){
     resp.name = sps_name,
     expl.var = stack_present_sub, #stack_present_baby
     PA.strategy = "random", 
-    PA.nb.rep = 1, #3, 
+    PA.nb.rep = 1, # Intentionally only one set of 5,000 pseudo absences is generated
     PA.nb.absences = 5000)
   # ) # 0 seconds on test
   
@@ -124,8 +141,8 @@ biomod_pipeline <- function(sps_choice, force_run){
   biomod_option <- BIOMOD_ModelingOptions()
   
   # Load if the model has already been run
-  if(file.exists(paste0(sps_path,"/",sps_name,".",sps_name,".models.out")) & !force_run){
-    biomod_model <- loadRData(paste0(sps_path,"/",sps_name,".",sps_name,".models.out"))
+  if(file.exists(paste0(sps_path,"/",sps_dot_name,".",sps_name,".models.out")) & !force_run){
+    biomod_model <- loadRData(paste0(sps_path,"/",sps_dot_name,".",sps_name,".models.out"))
   } else {
     # Run the model
     # system.time(
@@ -135,10 +152,10 @@ biomod_pipeline <- function(sps_choice, force_run){
       models = c("RF", "GLM"),# "GAM", "ANN", "MARS"),
       bm.options = biomod_option,
       CV.strategy = "random",
-      CV.nb.rep = 1, #5,
+      CV.nb.rep = 1, # 5 final # 1 testing
       CV.perc = 0.7,
       metric.eval = c("TSS", "ROC", "KAPPA", "ACCURACY"),
-      var.import = 1, #3, # Number of permutations to estimate variable importance
+      var.import = 1, # 3 final # 1 testing
       scale.models = TRUE,
       CV.do.full.models = FALSE,
       nb.cpu = 1,
@@ -147,25 +164,31 @@ biomod_pipeline <- function(sps_choice, force_run){
   }
   
   # Load if the model has already been run
-  if(file.exists(paste0(sps_path,"/",sps_name,".",sps_name,".ensemble.models.out")) & !force_run){
-    biomod_ensemble <- loadRData(paste0(sps_path,"/",sps_name,".",sps_name,"ensemble.models.out"))
+  if(file.exists(paste0(sps_path,"/",sps_dot_name,".",sps_name,".ensemble.models.out")) & !force_run){
+    biomod_ensemble <- loadRData(paste0(sps_path,"/",sps_dot_name,".",sps_name,".ensemble.models.out"))
   } else {
     # Build the ensemble models
     # system.time(
     biomod_ensemble <- BIOMOD_EnsembleModeling(
       bm.mod = biomod_model,
-      models.chosen = "all",  # defines models kept (useful for removing non-preferred models)
+      models.chosen = "all",
       em.by = "all",
       em.algo = c("EMmean"),# "EMcv", "EMci"), 
       metric.select = c("TSS"),
-      metric.select.thresh = c(0.7), # Turn this off during testing if the ensemble won't run...
+      metric.select.thresh = c(0.7),
       metric.eval = c("TSS", "ROC"), #, "KAPPA, "ACCURACY"),
       EMci.alpha = 0.05,
-      var.import = 0, #3 # This takes a massive amount of time, the default is 0
+      var.import = 0, # 5 final # 0 testing
       nb.cpu = 1)
     # ) # ~40 minutes for full data 75 model run
   }
 
+  # If all models fail the TSS > 0.7 cutoff exit the pipeline
+  if(!file.exists(paste0(sps_path,"/",sps_dot_name,".",sps_name,".ensemble.models.out"))){
+    print("All models failed")
+    return()
+  } 
+  
   
   # 5. Present projections --------------------------------------------------
   
@@ -276,40 +299,57 @@ biomod_pipeline <- function(sps_choice, force_run){
   # Flush local tmp drive. Better not to do this if running on mulitple cores
   # unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
   
-  # Unlink Temp folder
+  # Unlink Temp folder - this also shows that the pipeline finished successfully
   unlink(paste0(sps_path,"/Temp"), recursive = TRUE)
 }
 
 
 # 7: Run the pipeline -----------------------------------------------------
 
+
 # Change the working directory so that biomod2 saves the results in a convenient folder
 setwd("~/PanArcticInvasion/data/spp_projection/")
+
 
 # Detect available cores automagically and set accordingly
 # registerDoParallel(cores = detectCores()-1)
 
 # Run one
 # registerDoParallel(cores = 1)
-system.time(biomod_pipeline(sps_files[122], force_run = TRUE))
+system.time(biomod_pipeline(sps_files[72]))
 # 150 seconds for 1 species on minimum reps
 
 # Run them all
 registerDoParallel(cores = 15)
 # NB: Currently failing
 system.time(
-plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE, force_run = TRUE)
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 ) # xxx seconds for 15 on minimum reps, ~38 minutes for all on minimum reps (many errors)
-
-# Set working directory back to project base
-setwd("~/PanArcticInvasion/")
 
 ## Error log
 # task 16 failed - "missing value where TRUE/FALSE needed"
+# task 8 failed - "missing value where TRUE/FALSE needed"
+# task 3 failed - "Some models predictions missing :none" - Gala
+# task 3 failed - "Some models predictions missing :none" - Jmar
 
 ## Species that did not run
-sps_folders <- dir("~/PanArcticInvasion/data/spp_projection/")
-sps_missing <- sps_names[which(!sps_names %in% sps_folders)]
+### By file count
+sps_file_count <- data.frame(files = list.files("~/PanArcticInvasion/data/spp_projection", full.names = T, recursive = T)) |> 
+  mutate(dir = sapply(strsplit(files, "/"), "[[", 7)) |> count(dir) |> filter(n == 24)
+sps_file_rerun <- sps_files[which(!sps_dot_names %in% sps_file_count$dir)]
+plyr::l_ply(sps_file_rerun, biomod_pipeline, .parallel = FALSE)
+
+### By date
+sps_date <- file.info(dir("~/PanArcticInvasion/data/spp_projection", full.names = T)) |> 
+  rownames_to_column(var = "folder_name") |> 
+  mutate(folder_name = sapply(strsplit(folder_name, "/"), "[[", 7)) |> 
+  filter(ctime < Sys.Date()-1) # Number of days in the past, may need to be adjusted
+sps_date_rerun <- sps_files[which(sps_folders$folder_name %in% sps_names)]
+plyr::l_ply(sps_date_rerun, biomod_pipeline, .parallel = TRUE)
+
+
+# Set working directory back to project base
+setwd("~/PanArcticInvasion/")
 
 
 # 8: Analyse model output -------------------------------------------------
