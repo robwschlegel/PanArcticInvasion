@@ -300,8 +300,15 @@ system.time(
 plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE, force_run = TRUE)
 ) # xxx seconds for 15 on minimum reps, ~38 minutes for all on minimum reps (many errors)
 
+# Set working directory back to project base
+setwd("~/PanArcticInvasion/")
+
 ## Error log
 # task 16 failed - "missing value where TRUE/FALSE needed"
+
+## Species that did not run
+sps_folders <- dir("~/PanArcticInvasion/data/spp_projection/")
+sps_missing <- sps_names[which(!sps_names %in% sps_folders)]
 
 
 # 8: Analyse model output -------------------------------------------------
