@@ -334,10 +334,10 @@ plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 
 ## Species that did not run
 ### By file count
-sps_file_count <- data.frame(files = list.files("~/PanArcticInvasion/data/spp_projection", full.names = T, recursive = T)) |> 
-  mutate(dir = sapply(strsplit(files, "/"), "[[", 7)) |> count(dir) |> filter(n == 24)
-sps_file_rerun <- sps_files[which(!sps_dot_names %in% sps_file_count$dir)]
-plyr::l_ply(sps_file_rerun, biomod_pipeline, .parallel = FALSE)
+# sps_file_count <- data.frame(files = list.files("~/PanArcticInvasion/data/spp_projection", full.names = T, recursive = T)) |> 
+#   mutate(dir = sapply(strsplit(files, "/"), "[[", 7)) |> count(dir) |> filter(n == 24)
+# sps_file_rerun <- sps_files[which(!sps_dot_names %in% sps_file_count$dir)]
+# plyr::l_ply(sps_file_rerun, biomod_pipeline, .parallel = FALSE)
 
 ### By date
 # sps_date <- file.info(dir("~/PanArcticInvasion/data/spp_projection", full.names = T)) |> 
@@ -383,13 +383,14 @@ setwd("~/PanArcticInvasion/")
 #   mutate(lon = round(lon, 4), lat = round(lat, 4))
 
 # Choose a species
-# sps_choice <- sps_names[4]
+# sps_choice <- sps_names[1]
 
 # Function that outputs BIOMOD projection comparison figures
 plot_biomod <- function(sps_choice){
  
   # File name
   sps_file <- sps_files[str_which(sps_files, sps_choice)]
+  sps_dot_name <- str_replace(sps_choice, "_", ".")
   
    # Load the species points
   # Load the species
@@ -400,9 +401,12 @@ plot_biomod <- function(sps_choice){
     dplyr::select(Sps, lon, lat) |> distinct()
   
   # Load the ensemble projections
-  biomod_project_present <- raster(paste0(sps_choice,"/proj_present/proj_present_",sps_choice,"_ensemble_TSSbin.tif"))
-  biomod_project_2050 <- raster(paste0(sps_choice,"/proj_2050/proj_2050_",sps_choice,"_ensemble_TSSbin.tif"))
-  biomod_project_2100 <- raster(paste0(sps_choice,"/proj_2100/proj_2100_",sps_choice,"_ensemble_TSSbin.tif"))
+  biomod_project_present <- raster(paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name,
+                                          "/proj_present/proj_present_",sps_dot_name,"_ensemble_TSSbin.tif"))
+  biomod_project_2050 <- raster(paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name,
+                                       "/proj_2050/proj_2050_",sps_dot_name,"_ensemble_TSSbin.tif"))
+  biomod_project_2100 <- raster(paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name,
+                                       "/proj_2100/proj_2100_",sps_dot_name,"_ensemble_TSSbin.tif"))
   
   # Convert to data.frames
   df_project_present <- rast_df(biomod_project_present[[1]])
@@ -474,4 +478,10 @@ plot_biomod <- function(sps_choice){
 # Create all visuals
 registerDoParallel(cores = 15)
 plyr::l_ply(sps_names, plot_biomod, .parallel = T)
+
+# Check that all figures run
+sps_fig_check <- str_remove(str_remove(dir("~/PanArcticInvasion/figures", 
+                                                full.names = FALSE), "biomod_diff_"), ".png")
+sps_fig_rerun <- sps_fig_check[which(!sps_names %in% sps_fig_check)]
+plyr::l_ply(sps_fig_rerun, plot_biomod, .parallel = FALSE)
 
