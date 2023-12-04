@@ -10,6 +10,7 @@
 # 7: Run the pipeline
 # 8: Analyse model output
 # 9: Model visualisations
+# 10: Copy files to a folder
 
 
 # 1: Setup ----------------------------------------------------------------
@@ -484,4 +485,18 @@ sps_fig_check <- str_remove(str_remove(dir("~/PanArcticInvasion/figures",
                                                 full.names = FALSE), "biomod_diff_"), ".png")
 sps_fig_rerun <- sps_fig_check[which(!sps_names %in% sps_fig_check)]
 plyr::l_ply(sps_fig_rerun, plot_biomod, .parallel = FALSE)
+
+
+# 10: Copy files to folder for sharing ------------------------------------
+
+# identify the folders
+spp_folder <- "data/spp_projection"
+new.folder <- "H:/Where I want my files to be copied to"
+
+# find the files that you want
+proj_files <- list.files(path = "data/spp_projection", recursive = TRUE,
+                         pattern = "ensemble_TSSbin.tif", full.names = TRUE)
+
+# copy the files to the new folder
+file.copy(proj_files, "data/spp_projection_ensemble_TSSbin")
 

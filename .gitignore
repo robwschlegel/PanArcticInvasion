@@ -68,6 +68,10 @@ data/BO_2100.RData
 figures/
 data/spp_presence/
 data/spp_projection/
+data/spp_projection_ensemble_TSSbin/
 metadata/decision_tree.csv
 metadata/species_list.csv
+
+# For other use
+data/spp_projection.zip
 
