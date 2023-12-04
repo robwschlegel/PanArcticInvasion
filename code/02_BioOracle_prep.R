@@ -20,7 +20,8 @@ registerDoParallel(cores = 15)
 options(scipen = 999)
 
 # Data requirements
-## Use all mean variables (we do not want to start looking at differences between max, min, or long term max or min)
+## Use all mean variables (we do not want to start looking at differences 
+  ## between max, min, or long term max or min)
 ## SST, SSS, and Ice thickness for all types of taxonomic groups. 
 ## Then add different variables according to each group:
 ## Fish: chlorophyll a and nitrates
