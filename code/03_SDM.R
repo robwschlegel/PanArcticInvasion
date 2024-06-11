@@ -46,6 +46,9 @@ if(!exists("stack_2050")) stack_2050 <- terra::rast("data/BO_2050.tiff")
 if(!exists("stack_2100")) stack_2100 <- terra::rast("data/BO_2100.tiff")
 # plot(stack_present) # Visualise raster stack
 
+# NB: These stack files contain the full global data
+# If it is decided to stay with the lat 30 to 90 range they must be cropped
+
 # Coordinates only
 global_coords <- as.data.frame(stack_present[[1]], xy = T) |> 
   dplyr::select(x,y) |> dplyr::rename(lon = x, lat = y) |> 
