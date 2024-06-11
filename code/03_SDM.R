@@ -20,9 +20,7 @@ source("code/00_functions.R")
 
 # Load additional packages
 library(biomod2)
-library(raster)
 library(FNN)
-library(doParallel)
 
 # The species occurrence data
 sps_list <- read_csv("~/PanArcticInvasion/metadata/species_list.csv") |> 
@@ -42,25 +40,20 @@ sps_dot_names <- str_replace(sps_names, "_", ".")
 
 # 2: Load data ------------------------------------------------------------
 
-# Load RData files for present, 2050, 2100
-if(!exists("BO_present")) load("data/BO_present.RData")
-if(!exists("BO_2050")) load("data/BO_2050.RData")
-if(!exists("BO_2100")) load("data/BO_2100.RData")
-
-# Coordinates only
-global_coords <- dplyr::select(BO_present, lon, lat) |> 
-  mutate(env_index = 1:nrow(BO_present))
-
-# Convert to raster stacks
-stack_present <- stack(rasterFromXYZ(BO_present, crs = "+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs"))
-stack_2050 <- stack(rasterFromXYZ(BO_2050, crs = "+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs"))
-stack_2100 <- stack(rasterFromXYZ(BO_2100, crs = "+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs"))
+# Load TIFF files for present, 2050, 2100
+if(!exists("stack_present")) stack_present <- terra::rast("data/BO_present.tiff")
+if(!exists("stack_2050")) stack_2050 <- terra::rast("data/BO_2050.tiff")
+if(!exists("stack_2100")) stack_2100 <- terra::rast("data/BO_2100.tiff")
 # plot(stack_present) # Visualise raster stack
 
+# Coordinates only
+global_coords <- as.data.frame(stack_present[[1]], xy = T) |> 
+  dplyr::select(x,y) |> dplyr::rename(lon = x, lat = y) |> 
+  distinct() |> mutate(env_index = 1:n())
+
 # Very small area for testing
-# stack_present_baby <- stack(rasterFromXYZ(filter(BO_present, lon >= -2, lon <= 2, lat >= 50, lat <= 52), 
-#                                           crs = "+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs"))
-# plot(stack_present_baby)
+stack_present_baby <- crop(stack_present, ext(-2, 2, 50, 52))
+plot(stack_present_baby)
 
 # Choose a species for testing the code
 # sps_choice <- sps_files[73]
@@ -103,13 +96,11 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   # Filter environmental data based on species classification
   sps_list_sub <- filter(sps_list, `Scientific name` == sps$Sps[1])
   if(sps_list_sub$`Functional Group`[1] == "Fish"){
-    stack_layers <- c("BO22_tempmean_ss", "BO22_salinitymean_ss", "BO22_icethickmean_ss", 
-                      "BO22_chlomean_ss", "BO22_nitratemean_ss")
+    stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "chl_mean", "no3_mean")
   } else if(sps_list_sub$`Functional Group`[1] %in% c("Phytobenthos", "Phytoplankton")){
-    stack_layers <- c("BO22_tempmean_ss", "BO22_salinitymean_ss", "BO22_icethickmean_ss",    
-                      "BO22_nitratemean_ss", "BO22_ironmean_ss", "BO22_parmean")
+    stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "no3_mean", "dfe_mean", "PAR_mean_mean")
   } else if(sps_list_sub$`Functional Group`[1] %in% c("Zoobenthos", "Zooplankton")){
-    stack_layers <- c("BO22_tempmean_ss", "BO22_salinitymean_ss", "BO22_icethickmean_ss", "BO22_chlomean_ss")
+    stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "chl_mean")
   }
   stack_present_sub <- stack_present[[stack_layers]]
   stack_2050_sub <- stack_2050[[stack_layers]]
@@ -121,7 +112,7 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
     resp.var = rep(1, nrow(sps)),
     resp.xy = as.matrix(sps[,2:3]),
     resp.name = sps_name,
-    expl.var = stack_present_sub, #stack_present_baby
+    expl.var = stack_present_sub, #stack_present_baby,
     PA.strategy = "random", 
     PA.nb.rep = 1, # Intentionally only one set of 5,000 pseudo absences is generated
     PA.nb.absences = 5000)

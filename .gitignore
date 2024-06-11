@@ -60,10 +60,10 @@ data/arctic_previous_ports.csv
 
 # Large BioOracle downloads
 data/BO_v3/
-data/BO_present.RData
-data/BO_future.RData
-data/BO_2050.RData
-data/BO_2100.RData
+data/BO_present*
+data/BO_future*
+data/BO_2050*
+data/BO_2100*
 
 # To be made public at a later date...
 figures/

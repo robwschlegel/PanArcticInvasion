@@ -14,8 +14,8 @@ library(doParallel); registerDoParallel(cores = 15)
 
 # BO v3 -------------------------------------------------------------------
 
-# var_choice <- "thetao"; scenario <- "ssp245"
-BO_v3_dl <- function(var_choice, scenario = "baseline"){
+# var_choice <- "thetao"; scenario <- "ssp245"; decade <- 2040
+BO_v3_dl <- function(var_choice, scenario = "baseline", decade = 2010){
   
   # Get info if necessary
   if(!exists("BO_layers")) BO_layers <- biooracler::list_layers(simplify = TRUE)
@@ -39,37 +39,24 @@ BO_v3_dl <- function(var_choice, scenario = "baseline"){
     var_name <- paste0(var_choice,"_mean")
   }
   
+  # Set decade
+  # NB: this is necessary for below
+  decade_chr <- as.character(decade+10)
+  file_name <- paste(var_name, scenario, decade_chr, sep = "_")
+  
   # Set constraints
+  # NB: Time must be two values, even if the same
+  time_con <-  rep(paste0(decade,"-01-01T00:00:00Z"), 2)
   lat_con <- c(-89.975, 89.975); lon_con <- c(-179.975, 179.975) 
-  # NB: time must be two values, even if the same
-  if(scenario == "baseline") {
-    layer_names <- paste(var_name,scenario,"2020", sep = "_")
-    time_con <-  c("2010-01-01T00:00:00Z", "2010-01-01T00:00:00Z")
-    set_con <- list(time_con, lat_con, lon_con); names(set_con) = c("time", "latitude", "longitude")
-  } else {
-    layer_names <- paste(var_name, scenario, c("2050", "2100"), sep = "_")
-    time_con <-  c("2040-01-01T00:00:00Z", "2090-01-01T00:00:00Z")
-    set_con_1 <- list(rep(time_con[1], 2), lat_con, lon_con); names(set_con_1) = c("time", "latitude", "longitude")
-    set_con_2 <- list(rep(time_con[2], 2), lat_con, lon_con); names(set_con_2) = c("time", "latitude", "longitude")
-  }
+  set_con <- list(time_con, lat_con, lon_con); names(set_con) = c("time", "latitude", "longitude")
   
   # Get data and exit
   # NB: Future projections are too beefy to download 2050 and 2100 at the same time
-  if(length(layer_names) == 2){
-    choice_layers_1 <- download_layers(dataset_id = dataset_choice$dataset_id,
-                                       variables = var_name, constraints = set_con_1)
-    choice_layers_2 <- download_layers(dataset_id = dataset_choice$dataset_id,
-                                       variables = var_name, constraints = set_con_2)
-    choice_layers <- c(choice_layers_1, choice_layers_2)
-  } else {
-    choice_layers <- download_layers(dataset_id = dataset_choice$dataset_id,
-                                     variables = var_name, constraints = set_con)
-  }
-  names(choice_layers) <- layer_names
-  saveRDS(choice_layers, file = paste0("data/BO_v3/",var_choice,"_",scenario,".rds"))
-  # return(choice_layers)
-  # rm(var_choice, scenario, dataset_choice, layer_names, time_con, lat_con, lon_con, set_con, set_con_1, set_con_2, var_name, 
-  #    choice_layers, choice_layers_1, choice_layers_2)
+  choice_layers <- download_layers(dataset_id = dataset_choice$dataset_id,
+                                   variables = var_name, constraints = set_con)
+  writeRaster(choice_layers, file = paste0("data/BO_v3/",file_name,".tiff"), overwrite = TRUE)
+  # rm(var_choice, scenario, dataset_choice, layer_names, time_con, lat_con, lon_con, set_con, set_con_1, set_con_2, var_name,
+     # choice_layers, choice_layers_1, choice_layers_2, decade, decade_chr, file_name)
 }
 
 

@@ -48,99 +48,56 @@ info_layer("thetao_baseline_2000_2019_depthsurf")
 
 ## Download all -----------------------------------------------------------
 
-# Present baseline tests
+# NB: Only need to run this once
+
+# Baseline 2020
 plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE)
 
 # RCP 4.5
-plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp245")
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp245", decade = 2040)
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp245", decade = 2090)
 
 # RCP 8.5
-plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp585")
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp585", decade = 2040)
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp585", decade = 2090)
 
 
 ## Present data -----------------------------------------------------------
 
+# Baseline 2020 files
+dir_baseline_2020 <- dir("data/BO_v3", pattern = "baseline_2020.tiff$", full.names = TRUE)
 
-var_choices <- c("thetao", "so", "sithick", "chl", "no3", "dfe", "par")
+# Load and stack
+BO3_baseline_2020 <- terra::rast(dir_baseline_2020)
+names(BO3_baseline_2020)
 
+# Plot
+plot(BO3_baseline_2020)
 
-# Load and stack them
-BO3_thetao_baseline <- read_rds("data/BO_V3/thetao_baseline.rds")
-BO3_so_baseline <- read_rds("data/BO_V3/so_baseline.rds")
-BO3_sithick_baseline <- loadRData("data/BO_V3/sithick_baseline.RData")
-BO3_chl_baseline <- loadRData("data/BO_V3/chl_baseline.RData")
-BO3_no3_baseline <- loadRData("data/BO_V3/no3_baseline.RData")
-BO3_dfe_baseline <- loadRData("data/BO_V3/dfe_baseline.RData")
-BO3_par_baseline <- loadRData("data/BO_V3/par_baseline.RData")
-BO3_baseline <- raster::stack(BO3_thetao_baseline, BO3_so_baseline)
-names(BO3_baseline)
-
-# Convert to dataframe
-BO_present <- as.data.frame(BO_layers_dl, xy = T) %>% 
-  dplyr::rename(lon = x, lat = y) %>% 
-  filter(BO22_icethickmean_ss >= 0, lat >= 30)
-save(BO_present, file = "data/BO_present.RData")
-rm(BO_layers_dl); gc()
-
-# Visualise
-ggplot(BO_present, aes(x = lon, y = lat)) +
-  geom_raster(aes(fill = BO22_parmean)) +
-  borders(fill = "grey70", colour = "black") +
-  scale_fill_viridis_c(option = "D") +
-  coord_quickmap(xlim = c(-180, 180), ylim = c(25, 90), expand = F) +
-  theme(legend.position = "bottom")
+# Save
+BO_present <- writeRaster(BO3_baseline_2020, file = "data/BO_present.tiff", overwrite = TRUE)
 
 
 ## Future data ------------------------------------------------------------
 
-# Load present data for easier joining
-if(!exists("BO_present")) load("data/BO_present.RData")
+# RCP8.5 2050 and 2100 files
+dir_ssp585_2050 <- c(dir("data/BO_v3", pattern = "ssp585_2050.tiff$", full.names = TRUE), 
+                     dir_baseline_2020[4]) # NB: Ensure this is adding the PAR data
+dir_ssp585_2100 <- c(dir("data/BO_v3", pattern = "ssp585_2100.tiff$", full.names = TRUE), 
+                     dir_baseline_2020[4]) # NB: Ensure this is adding the PAR data
 
-# Download as similar of layers as possible to present data
-                                           # SST, SSS, Ice thickness
-BO_layers_future <- get_future_layers(c("BO22_tempmean_ss", "BO22_salinitymean_ss", "BO22_icethickmean_ss",
-                                        # chlorophyll a 
-                                        # NB: no futre layers for nitrates, iron, PAR
-                                        "BO22_chlomean_ss"),
-                                        # NB: at the moment just getting surface values, but may want bottom, too
-                                        # "BO22_chlomean_bdmax"), 
-                                      scenario = "RCP85", year = c(2050, 2100))
+# Load and stack
+BO3_ssp585_2050 <- terra::rast(dir_ssp585_2050); names(BO3_ssp585_2050)
+BO3_ssp585_2100 <- terra::rast(dir_ssp585_2100); names(BO3_ssp585_2100)
 
-# NB: This will download the data, but throws an error when stacking them due to different chl a extent
-BO_layers_future_dl <- load_layers(BO_layers_future$layer_code)
-BO_future_chlo <- as.data.frame(load_layers(BO_layers_future$layer_code[c(1,5)]), xy = T)
-BO_future_other <- as.data.frame(load_layers(BO_layers_future$layer_code[c(2,3,4,6,7,8)]), xy = T)
+# Plot
+plot(BO3_ssp585_2050)
+plot(BO3_ssp585_2100)
+plot(c(BO3_baseline_2020[[7]], BO3_ssp585_2050[[6]], BO3_ssp585_2100[[6]]))
 
-# Convert to data.frame
-BO_future <- left_join(BO_future_other, BO_future_chlo, by = c("x", "y")) |> 
-  dplyr::rename(lon = x, lat = y) |> 
-  filter(BO22_RCP85_2100_icethickmean_ss >= 0, lat >= 30)
-save(BO_future, file = "data/BO_future.RData")
-rm(BO_layers_future, BO_layers_future_dl, BO_future_chlo, BO_future_other); gc()
-
-# Create 2050 data.frame
-BO_2050 <- BO_present %>% 
-  dplyr::select(lon, lat, BO22_nitratemean_ss:BO22_parmean) %>% 
-  left_join(dplyr::select(BO_future, lon, lat, BO22_RCP85_2050_icethickmean_ss:BO22_RCP85_2050_tempmean_ss,
-                          BO22_RCP85_2050_chlomean_ss), by = c("lon", "lat"))
-colnames(BO_2050) <- sub("RCP85_2050_", "", colnames(BO_2050))
-save(BO_2050, file = "data/BO_2050.RData")
-
-# Create 2100 data.frame
-BO_2100 <- BO_present %>% 
-  dplyr::select(lon, lat, BO22_nitratemean_ss:BO22_parmean) %>% 
-  left_join(dplyr::select(BO_future, lon, lat, BO22_RCP85_2100_icethickmean_ss:BO22_RCP85_2100_tempmean_ss,
-                          BO22_RCP85_2100_chlomean_ss), by = c("lon", "lat"))
-colnames(BO_2100) <- sub("RCP85_2100_", "", colnames(BO_2100))
-save(BO_2100, file = "data/BO_2100.RData")
-
-# Visualise
-ggplot(BO_2100, aes(x = lon, y = lat)) +
-  geom_raster(aes(fill = BO22_tempmean_ss)) +
-  borders(fill = "grey70", colour = "black") +
-  scale_fill_viridis_c(option = "D") +
-  coord_quickmap(xlim = c(-180, 180), ylim = c(25, 90), expand = F) +
-  theme(legend.position = "bottom")
+# Save
+BO_2050 <- writeRaster(BO3_ssp585_2050, file = "data/BO_2050.tiff", overwrite = TRUE)
+BO_2100 <- writeRaster(BO3_ssp585_2100, file = "data/BO_2100.tiff", overwrite = TRUE)
 
 
 # Test visuals ------------------------------------------------------------
