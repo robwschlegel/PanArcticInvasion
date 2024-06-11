@@ -1,6 +1,6 @@
 # code/02_BioOracle_prep.R
-# This script houses the code used to download and prepare the SDM data layers
-# from BioOracle
+# The code used to download and prepare the SDM data layers from Bio-Oracle v3.0
+
 
 # Setup -------------------------------------------------------------------
 
@@ -8,10 +8,7 @@
 source("code/00_functions.R")
 
 # Bio-Oracle access
-library(sdmpredictors)
-
-# Work with raster layers
-library(raster)
+library(biooracler)
 
 # Set cores
 registerDoParallel(cores = 15)
@@ -20,51 +17,63 @@ registerDoParallel(cores = 15)
 options(scipen = 999)
 
 # Data requirements
-## Use all mean variables (we do not want to start looking at differences 
-  ## between max, min, or long term max or min)
+## Use all mean variables
+  ## We do not want to start looking at differences between max, min, or long term max or min
 ## SST, SSS, and Ice thickness for all types of taxonomic groups. 
 ## Then add different variables according to each group:
-## Fish: chlorophyll a and nitrates
-## Phytopbenthos and Phytoplankton: nitrates, iron and PAR
+## Fish: chlorophyll a and nitrate
+## Phytopbenthos and Phytoplankton: nitrate, iron, and PAR
 ## Zoobenthos and Zooplankton: Chlorophyll a
 
 
 # Download and prep -------------------------------------------------------
 
+# Mean surface values for: 
+# temperature, salinity, sea ice thickness, chlorophyll a, nitrate, iron, and PAR present and future
+var_choices <- c("thetao", "so", "sithick", "chl", "no3", "dfe", "par")
+
 
 ## Metadata ---------------------------------------------------------------
 
-# Explore datasets in the package
-list_datasets()
-
 # Explore layers in a dataset
-BO_layers <- list_layers(datasets = "Bio-ORACLE") |> filter(version == 22)
-MAR_layers <- list_layers(datasets = "MARSPEC")
+BO_layers <- biooracler::list_layers(simplify = TRUE)
 
-# Check layer statistics
-layer_stats()
+# Info
+info_layer("thetao_baseline_2000_2019_depthsurf")
 
 # Future scenario conversions
 # https://ar5-syr.ipcc.ch/topic_futurechanges.php
-# RCP8.5 ~= A2
-# RCP6.0 ~= B2
-# RCP4.5 ~= B1
 
-# Look at possible layers
-BO_layers_future <- list_layers_future(datasets = "Bio-ORACLE") |> 
-  filter(scenario == "RCP85", version == 2.2)
+
+
+## Download all -----------------------------------------------------------
+
+# Present baseline tests
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE)
+
+# RCP 4.5
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp245")
+
+# RCP 8.5
+plyr::l_ply(var_choices, BO_v3_dl, .parallel = TRUE, scenario = "ssp585")
 
 
 ## Present data -----------------------------------------------------------
 
-# Download the chosen layers
-# NB: Don't run this if nothing has changed as there is no need to ping their servers
-                              # SST, SSS, Ice thickness
-BO_layers_dl <- load_layers(c("BO22_tempmean_ss", "BO22_salinitymean_ss", "BO22_icethickmean_ss",
-                              # chlorophyll a, nitrates, iron, PAR
-                              "BO22_chlomean_ss", "BO22_nitratemean_ss", "BO22_ironmean_ss", "BO22_parmean"))
-                              # NB: at the moment just getting surface values, but may want bottom, too
-                              # "BO22_chlomean_bdmax", "BO22_nitratemean_bdmax", "BO22_ironmean_bdmax"))
+
+var_choices <- c("thetao", "so", "sithick", "chl", "no3", "dfe", "par")
+
+
+# Load and stack them
+BO3_thetao_baseline <- read_rds("data/BO_V3/thetao_baseline.rds")
+BO3_so_baseline <- read_rds("data/BO_V3/so_baseline.rds")
+BO3_sithick_baseline <- loadRData("data/BO_V3/sithick_baseline.RData")
+BO3_chl_baseline <- loadRData("data/BO_V3/chl_baseline.RData")
+BO3_no3_baseline <- loadRData("data/BO_V3/no3_baseline.RData")
+BO3_dfe_baseline <- loadRData("data/BO_V3/dfe_baseline.RData")
+BO3_par_baseline <- loadRData("data/BO_V3/par_baseline.RData")
+BO3_baseline <- raster::stack(BO3_thetao_baseline, BO3_so_baseline)
+names(BO3_baseline)
 
 # Convert to dataframe
 BO_present <- as.data.frame(BO_layers_dl, xy = T) %>% 
@@ -132,4 +141,8 @@ ggplot(BO_2100, aes(x = lon, y = lat)) +
   scale_fill_viridis_c(option = "D") +
   coord_quickmap(xlim = c(-180, 180), ylim = c(25, 90), expand = F) +
   theme(legend.position = "bottom")
+
+
+# Test visuals ------------------------------------------------------------
+
 

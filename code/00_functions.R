@@ -6,8 +6,71 @@
 
 library(tidyverse)
 library(geosphere)
+library(raster)
+library(terra)
 library(arrow)
 library(doParallel); registerDoParallel(cores = 15)
+
+
+# BO v3 -------------------------------------------------------------------
+
+# var_choice <- "thetao"; scenario <- "ssp245"
+BO_v3_dl <- function(var_choice, scenario = "baseline"){
+  
+  # Get info if necessary
+  if(!exists("BO_layers")) BO_layers <- biooracler::list_layers(simplify = TRUE)
+  
+  # Extract dataset id
+  # NB: This more complicated method is used because not all baseline periods have
+  # the same year range. E.g. 2000-2018 OR 2000-2019
+  dataset_choice <- BO_layers |> 
+    filter(grepl(paste0(var_choice,"_"), dataset_id)) |> 
+    filter(grepl(paste0(scenario,"_"), dataset_id)) |> 
+    filter(grepl("depthsurf", dataset_id)) |> 
+    filter(!grepl("kdpar", dataset_id))
+  
+  # Exit if no values
+  if(nrow(dataset_choice) == 0) return()
+  
+  # Create variable names
+  if(var_choice == "par"){
+    var_name <- "PAR_mean_mean"
+  } else {
+    var_name <- paste0(var_choice,"_mean")
+  }
+  
+  # Set constraints
+  lat_con <- c(-89.975, 89.975); lon_con <- c(-179.975, 179.975) 
+  # NB: time must be two values, even if the same
+  if(scenario == "baseline") {
+    layer_names <- paste(var_name,scenario,"2020", sep = "_")
+    time_con <-  c("2010-01-01T00:00:00Z", "2010-01-01T00:00:00Z")
+    set_con <- list(time_con, lat_con, lon_con); names(set_con) = c("time", "latitude", "longitude")
+  } else {
+    layer_names <- paste(var_name, scenario, c("2050", "2100"), sep = "_")
+    time_con <-  c("2040-01-01T00:00:00Z", "2090-01-01T00:00:00Z")
+    set_con_1 <- list(rep(time_con[1], 2), lat_con, lon_con); names(set_con_1) = c("time", "latitude", "longitude")
+    set_con_2 <- list(rep(time_con[2], 2), lat_con, lon_con); names(set_con_2) = c("time", "latitude", "longitude")
+  }
+  
+  # Get data and exit
+  # NB: Future projections are too beefy to download 2050 and 2100 at the same time
+  if(length(layer_names) == 2){
+    choice_layers_1 <- download_layers(dataset_id = dataset_choice$dataset_id,
+                                       variables = var_name, constraints = set_con_1)
+    choice_layers_2 <- download_layers(dataset_id = dataset_choice$dataset_id,
+                                       variables = var_name, constraints = set_con_2)
+    choice_layers <- c(choice_layers_1, choice_layers_2)
+  } else {
+    choice_layers <- download_layers(dataset_id = dataset_choice$dataset_id,
+                                     variables = var_name, constraints = set_con)
+  }
+  names(choice_layers) <- layer_names
+  saveRDS(choice_layers, file = paste0("data/BO_v3/",var_choice,"_",scenario,".rds"))
+  # return(choice_layers)
+  # rm(var_choice, scenario, dataset_choice, layer_names, time_con, lat_con, lon_con, set_con, set_con_1, set_con_2, var_name, 
+  #    choice_layers, choice_layers_1, choice_layers_2)
+}
 
 
 # AIS data ----------------------------------------------------------------

@@ -59,6 +59,7 @@ data/all_AIS.csv
 data/arctic_previous_ports.csv
 
 # Large BioOracle downloads
+data/BO_v3/
 data/BO_present.RData
 data/BO_future.RData
 data/BO_2050.RData
