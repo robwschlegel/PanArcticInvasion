@@ -110,12 +110,15 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   stack_2100_sub <- stack_2100[[stack_layers]]
   
   # Prep data for modeling
+  # NB: No data are set aside for modelling at this step
+  ## Rather that is done below in the following steps
   # system.time(
   biomod_data <- BIOMOD_FormatingData(
     resp.var = rep(1, nrow(sps)),
     resp.xy = as.matrix(sps[,2:3]),
     resp.name = sps_name,
     expl.var = stack_present_sub, #stack_present_baby,
+    filter.raster = TRUE, # Removes duplicate points
     PA.strategy = "random", 
     PA.nb.rep = 1, # Intentionally only one set of 5,000 pseudo absences is generated
     PA.nb.absences = 5000)
