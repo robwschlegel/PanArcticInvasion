@@ -4,16 +4,22 @@
 
 # Setup -------------------------------------------------------------------
 
+# `biooracler` not available on CRAN
+# remotes::install_github("bio-oracle/biooracler")
+
+# Load libraries
 library(tidyverse)
 library(geosphere)
 library(raster)
 library(terra)
+library(biooracler)
 library(arrow)
 library(doParallel); registerDoParallel(cores = detectCores()-1)
 
 
 # BO v3 -------------------------------------------------------------------
 
+# Convenience function for easier downloading
 # var_choice <- "thetao"; scenario <- "ssp245"; decade <- 2040
 BO_v3_dl <- function(var_choice, scenario = "baseline", decade = 2010){
   
@@ -23,18 +29,32 @@ BO_v3_dl <- function(var_choice, scenario = "baseline", decade = 2010){
   # Extract dataset id
   # NB: This more complicated method is used because not all baseline periods have
   # the same year range. E.g. 2000-2018 OR 2000-2019
-  dataset_choice <- BO_layers |> 
-    filter(grepl(paste0(var_choice,"_"), dataset_id)) |> 
-    filter(grepl(paste0(scenario,"_"), dataset_id)) |> 
-    filter(grepl("depthsurf", dataset_id)) |> 
-    filter(!grepl("kdpar", dataset_id))
+  if(var_choice == "par"){
+    dataset_choice <- BO_layers |> 
+      filter(grepl(paste0(var_choice,"_"), dataset_id)) |>
+      filter(!grepl("kdpar", dataset_id)) |> 
+      filter(grepl(paste0(scenario,"_"), dataset_id))
+  } else if(var_choice %in% c("bathy", "area")){
+    dataset_choice <- BO_layers |> 
+      filter(grepl(paste0("terrain"), dataset_id))
+  } else {
+    dataset_choice <- BO_layers |> 
+      filter(grepl(paste0(var_choice,"_"), dataset_id)) |> 
+      filter(grepl(paste0(scenario,"_"), dataset_id)) |> 
+      filter(grepl("depthsurf", dataset_id)) |> 
+      filter(!grepl("kdpar", dataset_id))
+  }
   
   # Exit if no values
   if(nrow(dataset_choice) == 0) return()
   
   # Create variable names
   if(var_choice == "par"){
-    var_name <- "PAR_mean_mean"
+    var_name <- "par_mean_mean"
+  } else if(var_choice == "bathy"){
+    var_name <- "bathymetry_mean"
+  } else if(var_choice == "area"){
+    var_name <- "area"
   } else {
     var_name <- paste0(var_choice,"_mean")
   }
@@ -42,21 +62,32 @@ BO_v3_dl <- function(var_choice, scenario = "baseline", decade = 2010){
   # Set decade
   # NB: this is necessary for below
   decade_chr <- as.character(decade+10)
-  file_name <- paste(var_name, scenario, decade_chr, sep = "_")
+  if(var_choice  %in% c("bathy", "area")){
+    file_name <- paste(var_name, sep = "_")
+  } else {
+    file_name <- paste(var_name, scenario, decade_chr, sep = "_")
+  }
+  
+  # Check if file has already been downloaded
+  if(file.exists(paste0("data/BO_v3/",file_name,".tiff"))) return()
   
   # Set constraints
   # NB: Time must be two values, even if the same
-  time_con <-  rep(paste0(decade,"-01-01T00:00:00Z"), 2)
+  if(var_choice %in% c("bathy", "area")){
+    time_con <-  rep("1970-01-01T00:00:00Z", 2)
+  } else {
+    time_con <-  rep(paste0(decade,"-01-01T00:00:00Z"), 2)
+  }
+  # lat_con <- lat_lim; lon_con <- lon_lim 
   lat_con <- c(-89.975, 89.975); lon_con <- c(-179.975, 179.975) 
   set_con <- list(time_con, lat_con, lon_con); names(set_con) = c("time", "latitude", "longitude")
   
   # Get data and exit
-  # NB: Future projections are too beefy to download 2050 and 2100 at the same time
   choice_layers <- download_layers(dataset_id = dataset_choice$dataset_id,
                                    variables = var_name, constraints = set_con)
   writeRaster(choice_layers, file = paste0("data/BO_v3/",file_name,".tiff"), overwrite = TRUE)
   # rm(var_choice, scenario, dataset_choice, layer_names, time_con, lat_con, lon_con, set_con, set_con_1, set_con_2, var_name,
-     # choice_layers, choice_layers_1, choice_layers_2, decade, decade_chr, file_name)
+  # choice_layers, choice_layers_1, choice_layers_2, decade, decade_chr, file_name)
 }
 
 

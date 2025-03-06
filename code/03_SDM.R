@@ -114,7 +114,7 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   stack_2050_sub <- stack_2050[[stack_layers]]
   stack_2100_sub <- stack_2100[[stack_layers]]
   
-  # Prep data for modeling
+  # Prep data for modelling
   # NB: No data are set aside for modelling at this step
   ## Rather that is done below in the following steps
   # system.time(
