@@ -34,9 +34,9 @@ sps_names <- str_remove(dir("~/PanArcticInvasion/data/spp_presence",
 sps_dot_names <- str_replace(sps_names, "_", ".")
 
 # Mismatch between previous species list and Feb 2025
-sps_lis_Feb_2025 <- read_csv("~/PanArcticInvasion/metadata/Species distribution key_Feb28_2025.csv") |> 
+sps_list_Feb_2025 <- read_csv("~/PanArcticInvasion/metadata/Species distribution key_Feb28_2025.csv") |> 
   left_join(sps_list, by = c("Acronym", "Scientific name"))
-write_csv(sps_lis_Feb_2025, file = "metadata/sps_list_issues.csv")
+# write_csv(sps_list_Feb_2025, file = "metadata/sps_list_issues.csv")
 
 # NB: In the methodology all species with fewer than 40 points were removed from the study
 # Here is was found that a few species have fewer than 40 independent points
@@ -46,9 +46,9 @@ write_csv(sps_lis_Feb_2025, file = "metadata/sps_list_issues.csv")
 # 2: Load data ------------------------------------------------------------
 
 # Load TIFF files for present, 2050, 2100
-if(!exists("stack_present")) stack_present <- terra::rast("data/BO_present.tiff")
-if(!exists("stack_2050")) stack_2050 <- terra::rast("data/BO_2050.tiff")
-if(!exists("stack_2100")) stack_2100 <- terra::rast("data/BO_2100.tiff")
+if(!exists("stack_present")) stack_present <- terra::rast("data/BO_v3/BO_present.tiff")
+if(!exists("stack_2050")) stack_2050 <- terra::rast("data/BO_v3/BO_2050.tiff")
+if(!exists("stack_2100")) stack_2100 <- terra::rast("data/BO_v3/BO_2100.tiff")
 # plot(stack_present) # Visualise raster stack
 
 # NB: These stack files contain the full global data
@@ -60,8 +60,8 @@ global_coords <- as.data.frame(stack_present[[1]], xy = T) |>
   distinct() |> mutate(env_index = 1:n())
 
 # Very small area for testing
-stack_present_baby <- crop(stack_present, ext(-2, 2, 50, 52))
-plot(stack_present_baby)
+# stack_present_baby <- crop(stack_present, ext(-2, 2, 50, 52))
+# plot(stack_present_baby)
 
 # Choose a species for testing the code
 # sps_choice <- sps_files[73]
@@ -102,11 +102,12 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   # 3: Prep data ------------------------------------------------------------
   
   # Filter environmental data based on species classification
-  sps_list_sub <- filter(sps_list, `Scientific name` == sps$Sps[1])
+  # NB: This is based on the Feb 2025 list
+  sps_list_sub <- filter(sps_list_Feb_2025, `Scientific name` == sps$Sps[1])
   if(sps_list_sub$`Functional Group`[1] == "Fish"){
     stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "chl_mean", "no3_mean")
   } else if(sps_list_sub$`Functional Group`[1] %in% c("Phytobenthos", "Phytoplankton")){
-    stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "no3_mean", "dfe_mean", "PAR_mean_mean")
+    stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "no3_mean", "dfe_mean", "par_mean_mean")
   } else if(sps_list_sub$`Functional Group`[1] %in% c("Zoobenthos", "Zooplankton")){
     stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "chl_mean")
   }
@@ -126,7 +127,7 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
     filter.raster = TRUE, # Removes duplicate points
     PA.strategy = "random", 
     PA.nb.rep = 1, # Intentionally only one set of 5,000 pseudo absences is generated
-    PA.nb.absences = 5000)
+    PA.nb.absences = 5000) # 100 for baby range
   # ) # 0 seconds on test
   
   # Visualise
@@ -141,7 +142,8 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   # 4: Model ----------------------------------------------------------------
   
   # Model options
-  biomod_option <- BIOMOD_ModelingOptions()
+  # NB: Deprecated
+  # biomod_option <- BIOMOD_ModelingOptions()
   
   # Load if the model has already been run
   if(file.exists(paste0(sps_path,"/",sps_dot_name,".",sps_name,".models.out")) & !force_run){
@@ -153,7 +155,6 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
       bm.format = biomod_data,
       modeling.id = sps_name,
       models = c("RF", "GLM", "GAM", "ANN", "MARS"),
-      bm.options = biomod_option,
       CV.strategy = "random",
       CV.nb.rep = 5, # 5 final # 1 testing
       CV.perc = 0.7,
