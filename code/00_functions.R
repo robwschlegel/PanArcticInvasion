@@ -9,7 +9,7 @@ library(geosphere)
 library(raster)
 library(terra)
 library(arrow)
-library(doParallel); registerDoParallel(cores = 15)
+library(doParallel); registerDoParallel(cores = detectCores()-1)
 
 
 # BO v3 -------------------------------------------------------------------

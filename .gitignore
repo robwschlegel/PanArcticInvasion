@@ -72,6 +72,8 @@ data/spp_projection/
 data/spp_projection_ensemble_TSSbin/
 metadata/decision_tree.csv
 metadata/species_list.csv
+metadata/Species distribution key_Feb28_2025.csv
+metadata/sps_list_issues.csv
 
 # For other use
 data/spp_projection.zip

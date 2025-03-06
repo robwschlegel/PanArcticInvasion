@@ -33,6 +33,11 @@ sps_names <- str_remove(dir("~/PanArcticInvasion/data/spp_presence",
                             full.names = F, pattern = "final"), pattern = "_final.csv")
 sps_dot_names <- str_replace(sps_names, "_", ".")
 
+# Mismatch between previous species list and Feb 2025
+sps_lis_Feb_2025 <- read_csv("~/PanArcticInvasion/metadata/Species distribution key_Feb28_2025.csv") |> 
+  left_join(sps_list, by = c("Acronym", "Scientific name"))
+write_csv(sps_lis_Feb_2025, file = "metadata/sps_list_issues.csv")
+
 # NB: In the methodology all species with fewer than 40 points were removed from the study
 # Here is was found that a few species have fewer than 40 independent points
 # But for the time being they are still included in this analysis
@@ -318,7 +323,7 @@ setwd("~/PanArcticInvasion/data/spp_projection/")
 # 150 seconds for 1 species on minimum reps
 
 # Run them all
-registerDoParallel(cores = 15)
+registerDoParallel(cores = detectCores()-1)
 # NB: Currently failing
 system.time(
 plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
@@ -474,7 +479,7 @@ plot_biomod <- function(sps_choice){
 }
 
 # Create all visuals
-registerDoParallel(cores = 15)
+registerDoParallel(cores = detectCores()-1)
 plyr::l_ply(sps_names, plot_biomod, .parallel = T)
 
 # Check that all figures run
@@ -486,14 +491,14 @@ plyr::l_ply(sps_fig_rerun, plot_biomod, .parallel = FALSE)
 
 # 10: Copy files to folder for sharing ------------------------------------
 
-# identify the folders
+# Identify the folders
 spp_folder <- "data/spp_projection"
-new.folder <- "H:/Where I want my files to be copied to"
+new_folder <- "H:/Where I want my files to be copied to"
 
-# find the files that you want
-proj_files <- list.files(path = "data/spp_projection", recursive = TRUE,
+# Find the files that you want
+proj_files <- list.files(path = spp_folder, recursive = TRUE,
                          pattern = "ensemble_TSSbin.tif", full.names = TRUE)
 
-# copy the files to the new folder
+# Copy the files to the new folder
 file.copy(proj_files, "data/spp_projection_ensemble_TSSbin")
 
