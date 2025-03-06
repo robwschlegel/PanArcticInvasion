@@ -47,9 +47,13 @@ sps_list_Feb_2025 <- read_csv("~/PanArcticInvasion/metadata/Species distribution
 
 # Load TIFF files for present, 2050, 2100
 if(!exists("stack_present")) stack_present <- terra::rast("data/BO_v3/BO_present.tiff")
+if(!exists("stack_present_N")) stack_present_N <- crop(stack_present, ext(-180, 180, 30, 90))
 if(!exists("stack_2050")) stack_2050 <- terra::rast("data/BO_v3/BO_2050.tiff")
+if(!exists("stack_2050_N")) stack_2050_N <- crop(stack_2050, ext(-180, 180, 30, 90))
 if(!exists("stack_2100")) stack_2100 <- terra::rast("data/BO_v3/BO_2100.tiff")
+if(!exists("stack_2100_N")) stack_2100_N <- crop(stack_2100, ext(-180, 180, 30, 90))
 # plot(stack_present) # Visualise raster stack
+# plot(stack_2100_N) # Visualise Northern Hemisphere raster stack
 
 # NB: These stack files contain the full global data
 # If it is decided to stay with the lat 30 to 90 range they must be cropped
@@ -59,15 +63,11 @@ global_coords <- as.data.frame(stack_present[[1]], xy = T) |>
   dplyr::select(x,y) |> dplyr::rename(lon = x, lat = y) |> 
   distinct() |> mutate(env_index = 1:n())
 
-# Very small area for testing
-# stack_present_baby <- crop(stack_present, ext(-2, 2, 50, 52))
-# plot(stack_present_baby)
-
 # Choose a species for testing the code
 # sps_choice <- sps_files[73]
 
 # The full pipeline wrapped into a function
-biomod_pipeline <- function(sps_choice, force_run = TRUE){
+biomod_pipeline <- function(sps_choice, force_run = TRUE, test_run = TRUE){
   
   # The species abbreviation
   # NB: This will change based on the users folder structure
@@ -111,23 +111,40 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   } else if(sps_list_sub$`Functional Group`[1] %in% c("Zoobenthos", "Zooplankton")){
     stack_layers <- c("thetao_mean", "so_mean", "sithick_mean", "chl_mean")
   }
-  stack_present_sub <- stack_present[[stack_layers]]
-  stack_2050_sub <- stack_2050[[stack_layers]]
-  stack_2100_sub <- stack_2100[[stack_layers]]
+  
+  # Filter raster stacks by layers
+  # NB: These are the Northern Hemisphere data
+  stack_present_sub <- stack_present_N[[stack_layers]]
+  stack_2050_sub <- stack_2050_N[[stack_layers]]
+  stack_2100_sub <- stack_2100_N[[stack_layers]]
+  
+  if(test_run){
+    # Very small area for testing
+    stack_present_sub <- crop(stack_present_sub, ext(-2, 2, 50, 52))
+    stack_2050_sub <- crop(stack_2050_sub, ext(-2, 2, 50, 52))
+    stack_2100_sub <- crop(stack_2100_sub, ext(-2, 2, 50, 52))
+    # plot(stack_present_baby)
+  }
+
   
   # Prep data for modelling
   # NB: No data are set aside for modelling at this step
   ## Rather that is done below in the following steps
+  if(test_run){
+    abs_count <- 100
+  } else {
+    abs_count <- 5000
+  }
   # system.time(
   biomod_data <- BIOMOD_FormatingData(
     resp.var = rep(1, nrow(sps)),
     resp.xy = as.matrix(sps[,2:3]),
     resp.name = sps_name,
-    expl.var = stack_present_sub, #stack_present_baby,
+    expl.var = stack_present_sub,
     filter.raster = TRUE, # Removes duplicate points
     PA.strategy = "random", 
     PA.nb.rep = 1, # Intentionally only one set of 5,000 pseudo absences is generated
-    PA.nb.absences = 5000) # 100 for baby range
+    PA.nb.absences = abs_count)
   # ) # 0 seconds on test
   
   # Visualise
@@ -141,25 +158,27 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   
   # 4: Model ----------------------------------------------------------------
   
-  # Model options
-  # NB: Deprecated
-  # biomod_option <- BIOMOD_ModelingOptions()
-  
   # Load if the model has already been run
   if(file.exists(paste0(sps_path,"/",sps_dot_name,".",sps_name,".models.out")) & !force_run){
     biomod_model <- loadRData(paste0(sps_path,"/",sps_dot_name,".",sps_name,".models.out"))
   } else {
+    
     # Run the model
+    if(test_run){
+      nb_rep <- 1; var_imp <- 1
+    } else {
+      nb_rep <- 5; var_imp <- 3
+    }
     # system.time(
     biomod_model <- BIOMOD_Modeling(
       bm.format = biomod_data,
       modeling.id = sps_name,
       models = c("RF", "GLM", "GAM", "ANN", "MARS"),
       CV.strategy = "random",
-      CV.nb.rep = 5, # 5 final # 1 testing
+      CV.nb.rep = nb_rep,
       CV.perc = 0.7,
       metric.eval = c("TSS", "ROC", "KAPPA", "ACCURACY"),
-      var.import = 3, # 3 final # 1 testing
+      var.import = var_imp,
       scale.models = TRUE,
       CV.do.full.models = FALSE,
       nb.cpu = 1,
@@ -177,9 +196,14 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
       bm.mod = biomod_model,
       models.chosen = "all",
       em.by = "all",
-      em.algo = c("EMmean", "EMcv", "EMci"), 
-      metric.select = c("TSS"),
-      metric.select.thresh = c(0.7),
+      em.algo = c("EMmean", "EMmedian", "EMcv", "EMci"),
+      # No longer works after biomod v4.2+
+      # https://github.com/biomodhub/biomod2/issues/166
+      # metric.select = c("TSS"),
+      # metric.select.thresh = c(0.7),
+      metric.select = NULL,
+      metric.select.thresh = -2,
+      #
       metric.eval = c("TSS", "ROC", "KAPPA", "ACCURACY"),
       EMci.alpha = 0.05,
       var.import = 5, # 5 final # 0 testing
@@ -201,7 +225,7 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   biomod_projection <- BIOMOD_Projection(
     bm.mod = biomod_model,
     proj.name = "present",
-    new.env = stack_present_sub, #stack_present_baby,
+    new.env = stack_present_sub,
     models.chosen = "all",
     metric.binary = "TSS",
     compress = "gzip",
@@ -237,11 +261,10 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   
   # Run 2050 projections
   # system.time(
-  # system.time(
     biomod_projection_2050 <- BIOMOD_Projection(
       bm.mod = biomod_model,
       proj.name = "2050",
-      new.env = stack_2050_sub, #stack_present_baby,
+      new.env = stack_2050_sub,
       models.chosen = "all",
       metric.binary = "TSS",
       compress = "gzip",
@@ -271,11 +294,10 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   
   # Run 2100 projections
   # system.time(
-  # system.time(
     biomod_projection_2100 <- BIOMOD_Projection(
       bm.mod = biomod_model,
       proj.name = "2100",
-      new.env = stack_2100_sub, #stack_present_baby,
+      new.env = stack_2100_sub,
       models.chosen = "all",
       metric.binary = "TSS",
       compress = "gzip",
@@ -285,7 +307,7 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE){
   # ) # xx seconds for full data 75 model run
   # plot(biomod_projection_2100)
   
-  # Create 2050 ensemble projections
+  # Create 2100 ensemble projections
   # system.time(
     biomod_ensemble_projection_2100 <- BIOMOD_EnsembleForecasting(
       bm.em = biomod_ensemble,
@@ -316,12 +338,12 @@ setwd("~/PanArcticInvasion/data/spp_projection/")
 
 
 # Detect available cores automagically and set accordingly
-# registerDoParallel(cores = detectCores()-1)
+registerDoParallel(cores = detectCores()-1)
 
-# Run one
+# Run one test
 # registerDoParallel(cores = 1)
-# system.time(biomod_pipeline(sps_files[14]))
-# 150 seconds for 1 species on minimum reps
+system.time(biomod_pipeline(sps_files[73]))
+# 19 seconds for 1 species on minimum reps and baby range
 
 # Run them all
 registerDoParallel(cores = detectCores()-1)
@@ -359,7 +381,7 @@ setwd("~/PanArcticInvasion/")
 # 8: Analyse model output -------------------------------------------------
 
 # Choose a species for the following code
-# sps_choice <- sps_names[1]
+# sps_choice <- sps_names[73]
 
 # Load chosen biomod_model and print evaluation scores
 # biomod_model <- loadRData(paste0(sps_choice,"/",sps_choice,".",sps_choice,".models.out"))
@@ -387,7 +409,7 @@ setwd("~/PanArcticInvasion/")
 #   mutate(lon = round(lon, 4), lat = round(lat, 4))
 
 # Choose a species
-# sps_choice <- sps_names[1]
+# sps_choice <- sps_names[73]
 
 # Function that outputs BIOMOD projection comparison figures
 plot_biomod <- function(sps_choice){
@@ -481,7 +503,7 @@ plot_biomod <- function(sps_choice){
 
 # Create all visuals
 registerDoParallel(cores = detectCores()-1)
-plyr::l_ply(sps_names, plot_biomod, .parallel = T)
+plyr::l_ply(sps_names, plot_biomod, .parallel = TRUE)
 
 # Check that all figures run
 sps_fig_check <- str_remove(str_remove(dir("~/PanArcticInvasion/figures", 
