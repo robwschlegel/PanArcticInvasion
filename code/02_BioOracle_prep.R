@@ -7,6 +7,7 @@
 
 # Load packages+functions
 source("code/00_functions.R")
+library(doParallel)
 
 # Set cores
 registerDoParallel(cores = detectCores()-1)

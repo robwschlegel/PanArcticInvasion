@@ -14,7 +14,6 @@ library(raster)
 library(terra)
 library(biooracler)
 library(arrow)
-library(doParallel); registerDoParallel(cores = detectCores()-1)
 
 
 # BO v3 -------------------------------------------------------------------
