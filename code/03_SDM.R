@@ -58,17 +58,17 @@ global_coords <- as.data.frame(stack_present[[1]], xy = T) |>
   distinct() |> mutate(env_index = 1:n())
 
 # Choose a species for testing the code
-# sps_choice <- sps_files[3]
+# sps_choice <- sps_files[1]
 
 # The full pipeline wrapped into a function
-biomod_pipeline <- function(sps_choice, force_run = TRUE, test_run = TRUE, n_cores = 4){
+biomod_pipeline <- function(sps_choice, force_run = FALSE, test_run = FALSE, n_cores = 4){
   
   # The species abbreviation
   # NB: This will change based on the users folder structure
   sps_acc <- str_remove(sapply(strsplit(sps_choice, "/"), "[[", 7), "_final.csv")
   
   # Skip species if a folder has already been created for it and force_run is FALSE
-  if(file.exists(paste0("~/PanArcticInvasion/data/spp_projection/",sps_acc)) & !force_run){
+  if(file.exists(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_acc)) & !force_run){
     return("Species has already been modelled and force_run is FALSE")
   }
   
@@ -88,7 +88,7 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE, test_run = TRUE, n_cor
   
   # Set temp folder save locations
   # See: http://www.r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
-  sps_path <- paste0("~/PanArcticInvasion/data/spp_projection/",sps_acc)
+  sps_path <- paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_acc)
   dir.create(file.path(sps_path), showWarnings = FALSE)
   dir.create(file.path(paste0(sps_path,"/Temp")), showWarnings = FALSE)
   rasterOptions(tmpdir = paste0(sps_path,"/Temp"))
@@ -333,27 +333,20 @@ biomod_pipeline <- function(sps_choice, force_run = TRUE, test_run = TRUE, n_cor
 
 
 # Change the working directory so that biomod2 saves the results in a convenient folder
-setwd("~/PanArcticInvasion/data/spp_projection/")
-
-# Detect available cores automagically and set accordingly
-# registerDoParallel(cores = detectCores()-1)
+setwd("~/pCloud Drive/PanArctic/data/spp_projection/")
 
 # Run one test
-# system.time(biomod_pipeline(sps_files[73]))
+# system.time(biomod_pipeline(sps_files[73], test_run = TRUE))
 # 19 seconds for 1 species on minimum reps and baby range
-# system.time(biomod_pipeline(sps_files[45], test_run = FALSE))
+# system.time(biomod_pipeline(sps_files[1], test_run = FALSE))
 # ~35 minutes for a full run
 
 # Run them all
 # NB: Do not run in parallel
-plyr::l_ply(sps_files[1:15], biomod_pipeline, .parallel = FALSE, 
+plyr::l_ply(sps_files[1:105], biomod_pipeline, .parallel = FALSE,
             force_run = FALSE, test_run = FALSE, n_cores = 4)
 
 ## Error log
-# task 16 failed - "missing value where TRUE/FALSE needed"
-# task 8 failed - "missing value where TRUE/FALSE needed"
-# task 3 failed - "Some models predictions missing :none" - Gala
-# task 3 failed - "Some models predictions missing :none" - Jmar
 
 ## Species that did not run
 ### By file count
@@ -381,7 +374,7 @@ setwd("~/PanArcticInvasion/")
 # sps_choice <- sps_names[73]
 
 # Load chosen biomod_model and print evaluation scores
-# biomod_model <- loadRData(paste0("~/PanArcticInvasion/data/spp_projection/",sps_choice,"/",sps_choice,".",sps_choice,".models.out"))
+# biomod_model <- loadRData(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_choice,"/",sps_choice,".",sps_choice,".models.out"))
 # biomod_model
 # get_evaluations(biomod_model)
 
@@ -398,12 +391,6 @@ setwd("~/PanArcticInvasion/")
 
 
 # 9: Visualise ensemble models --------------------------------------------
-
-# Load data used for maps etc.
-# load("data/Arctic_AM.RData")
-# colnames(Arctic_AM)[4] <- "depth"
-# Arctic_AM <- Arctic_AM %>%
-#   mutate(lon = round(lon, 4), lat = round(lat, 4))
 
 # Choose a species
 # sps_choice <- sps_names[73]
@@ -425,11 +412,11 @@ plot_biomod <- function(sps_choice){
     dplyr::select(Sps, lon, lat) |> distinct()
   
   # Load the ensemble projections
-  biomod_project_present <- raster(paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name,
+  biomod_project_present <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_dot_name,
                                           "/proj_present/proj_present_",sps_dot_name,"_ensemble_TSSbin.tif"))
-  biomod_project_2050 <- raster(paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name,
+  biomod_project_2050 <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_dot_name,
                                        "/proj_2050/proj_2050_",sps_dot_name,"_ensemble_TSSbin.tif"))
-  biomod_project_2100 <- raster(paste0("~/PanArcticInvasion/data/spp_projection/",sps_dot_name,
+  biomod_project_2100 <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_dot_name,
                                        "/proj_2100/proj_2100_",sps_dot_name,"_ensemble_TSSbin.tif"))
   
   # Convert to data.frames
