@@ -342,8 +342,8 @@ setwd("~/pCloud Drive/PanArctic/data/spp_projection/")
 # ~35 minutes for a full run
 
 # Run them all
-# NB: Do not run in parallel
-plyr::l_ply(sps_files[1:105], biomod_pipeline, .parallel = FALSE,
+## NB: Do not run in parallel
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = FALSE,
             force_run = FALSE, test_run = FALSE, n_cores = 4)
 
 ## Error log
@@ -393,31 +393,41 @@ setwd("~/PanArcticInvasion/")
 # 9: Visualise ensemble models --------------------------------------------
 
 # Choose a species
-# sps_choice <- sps_names[73]
+# sps_choice <- sps_accs[83]
 
 # Function that outputs BIOMOD projection comparison figures
-# TODO: Run this step by step to ensure it stills behaves as expected
-plot_biomod <- function(sps_choice){
+plot_biomod <- function(sps_choice, FORCE = FALSE){
  
+  # Get file name and skip if not FORCE = TRUE
   # File name
-  sps_file <- sps_files[str_which(sps_files, sps_choice)]
-  sps_dot_name <- str_replace(sps_choice, "_", ".")
+  file_name <- paste0("~/pCloud Drive/PanArctic/figures/biomod_diff_",sps_choice,".png")
+  if(file.exists(file_name) & !FORCE){
+    return(paste0("Plot for ",sps_choice," already exists"))
+  }
   
-   # Load the species points
-  # Load the species
-  sps_points <- read_csv(sps_file) |> filter(!is.na(Long), !is.na(Lat))
+  # Otherwise continue with plotting
+  print(paste0("Plotting ",sps_choice))
+  sps_file <- sps_files[str_which(sps_files, sps_choice)]
+  
+  # Load the species points
+  supressMessages(
+  sps_points <- read_csv(sps_file) |> 
+    dplyr::select(Sps, Long, Lat) |> 
+    filter(!is.na(Long), !is.na(Lat)) |> 
+    dplyr::mutate(Long = as.numeric(Long), Lat = as.numeric(Lat))
+  )
   sps_points$env_index = as.vector(knnx.index(as.matrix(global_coords[,c("lon", "lat")]),
-                                       as.matrix(sps_points[,3:4]), k = 1))
+                                       as.matrix(sps_points[,2:3]), k = 1))
   sps_points <- left_join(sps_points, global_coords, by = "env_index") |> 
     dplyr::select(Sps, lon, lat) |> distinct()
   
   # Load the ensemble projections
-  biomod_project_present <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_dot_name,
-                                          "/proj_present/proj_present_",sps_dot_name,"_ensemble_TSSbin.tif"))
-  biomod_project_2050 <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_dot_name,
-                                       "/proj_2050/proj_2050_",sps_dot_name,"_ensemble_TSSbin.tif"))
-  biomod_project_2100 <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_dot_name,
-                                       "/proj_2100/proj_2100_",sps_dot_name,"_ensemble_TSSbin.tif"))
+  biomod_project_present <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_choice,
+                                          "/proj_present/proj_present_",sps_choice,"_ensemble_TSSbin.tif"))
+  biomod_project_2050 <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_choice,
+                                       "/proj_2050/proj_2050_",sps_choice,"_ensemble_TSSbin.tif"))
+  biomod_project_2100 <- raster(paste0("~/pCloud Drive/PanArctic/data/spp_projection/",sps_choice,
+                                       "/proj_2100/proj_2100_",sps_choice,"_ensemble_TSSbin.tif"))
   
   # Convert to data.frames
   df_project_present <- rast_df(biomod_project_present[[1]])
@@ -425,15 +435,18 @@ plot_biomod <- function(sps_choice){
   df_project_2100 <- rast_df(biomod_project_2100[[1]])
   
   # Visualise present data
-  plot_present <- df_project_present %>% 
-    filter(presence == 1) %>% 
+  plot_present <- df_project_present |> 
+    filter(presence == 1) |> 
     ggplot(aes(x = lon, y = lat)) +
     geom_tile(aes(fill = as.factor(presence))) +
     borders(fill = "grey90", colour = "black") +
     geom_point(data = sps_points, colour = "yellow", size = 0.5) +
-    scale_y_continuous(breaks = c(40, 60, 80), labels = c("40°N", "60°N", "80°N")) +
+    # Old code that limited projection from 30 to 90 lat
+    # scale_y_continuous(breaks = c(40, 60, 80), labels = c("40°N", "60°N", "80°N")) +
+    # coord_quickmap(xlim = c(-180, 180), ylim = c(30, 90), expand = F) +
+    scale_y_continuous(breaks = c(-60, -30, 0, 30, 60), labels = c("60°S", "30°S", "0°N", "30°N", "60°N")) +
     scale_x_continuous(breaks = c(-160, -80, 0, 80, 160), labels = c("160°W", "80°W", "0°E", "60°E", "160°E")) +
-    coord_quickmap(xlim = c(-180, 180), ylim = c(30, 90), expand = F) +
+    coord_quickmap(xlim = c(-180, 180), ylim = c(-80, 90), expand = F) +
     scale_fill_manual(values = c("forestgreen")) +
     labs(x = NULL, y = NULL, fill = "presence", 
          title = paste0(sps_points$Sps)) +
@@ -453,9 +466,10 @@ plot_biomod <- function(sps_choice){
       ggplot(aes(x = lon, y = lat)) +
       geom_tile(aes(fill = change)) +
       borders(fill = "grey90", colour = "black") +
-      scale_y_continuous(breaks = c(40, 60, 80), labels = c("40°N", "60°N", "80°N")) +
+      # scale_y_continuous(breaks = c(40, 60, 80), labels = c("40°N", "60°N", "80°N")) +
+      scale_y_continuous(breaks = c(-60, -30, 0, 30, 60), labels = c("60°S", "30°S", "0°N", "30°N", "60°N")) +
       scale_x_continuous(breaks = c(-160, -80, 0, 80, 160), labels = c("160°W", "80°W", "0°E", "60°E", "160°E")) +
-      coord_quickmap(xlim = c(-180, 180), ylim = c(30, 90), expand = F) +
+      coord_quickmap(xlim = c(-180, 180), ylim = c(-80, 90), expand = F) +
       scale_fill_brewer(palette = "Set1", direction = -1) +
       labs(x = NULL, y = NULL, title = paste0("Present - ",year_label)) +
       theme_bw() +
@@ -470,6 +484,15 @@ plot_biomod <- function(sps_choice){
   # Visualise present - 2100
   plot_2100 <- plot_diff(df_project_2100, "2100")
   
+  # Get legend
+  get_legend <- function(ref_gplot){
+    tmp <- ggplot_gtable(ggplot_build(ref_gplot))
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+    legend <- tmp$grobs[[leg]]
+    return(legend)
+  }
+  change_legend <- get_legend(plot_2100)
+  
   # Combine and save
   plot_ALL <- cowplot::plot_grid(
     cowplot::plot_grid(
@@ -478,17 +501,15 @@ plot_biomod <- function(sps_choice){
       plot_2100 + theme(legend.position = "none"),
       nrow = 3,
       align = "h"),
-    cowplot::plot_grid(
-      cowplot::get_legend(plot_2100)),
+    change_legend,
     nrow = 2, rel_heights = c(10,1)
   )
-  cowplot::save_plot(paste0("figures/biomod_diff_",sps_choice,".png"), plot_ALL, base_width = 10, base_height = 12)
-  # ggsave(paste0("figures/biomod_diff_",sps_choice,".png"), plot_ALL, width = 12, height = 12)
+  cowplot::save_plot(file_name, plot_ALL, base_width = 10, base_height = 14)
 }
 
 # Create all visuals
-# registerDoParallel(cores = detectCores()-1)
-# plyr::l_ply(sps_names, plot_biomod, .parallel = TRUE)
+# NB: Do not run in parallel, it does not behave as expected
+plyr::l_ply(sps_accs, plot_biomod, .parallel = FALSE)
 
 # Check that all figures run
 # sps_fig_check <- str_remove(str_remove(dir("~/PanArcticInvasion/figures", 
